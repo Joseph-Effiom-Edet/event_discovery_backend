@@ -42,6 +42,36 @@ The backend is a Node.js application built with the Express framework. It provid
 -   API endpoint documentation served at the root (`/`)
 -   Docker support for consistent development and deployment
 
+## Setup Instructions
+
+_TODO: Add detailed setup instructions here, perhaps referencing the 'Getting Started' section or adding specific steps._
+
+## Architectural Decisions
+
+_TODO: Briefly explain key architectural choices:_
+- _Why Express?_
+- _Why Drizzle ORM?_
+- _Why JWT for authentication?_
+- _Why PostgreSQL?_
+- _Approach to structuring routes/controllers/services (if applicable)._
+
+## Assumptions or Limitations
+
+_TODO: List any assumptions made during development or known limitations:_
+- _Example: Assumes a specific version of Node.js._
+- _Example: Limited error handling for certain edge cases._
+- _Example: No real-time features implemented._
+- _Example: Security considerations (e.g., rate limiting not implemented)._
+
+## Future Improvements
+
+_TODO: Outline potential future enhancements:_
+- _Example: Implement more robust testing (unit, integration)._
+- _Example: Add caching mechanisms._
+- _Example: Implement role-based access control._
+- _Example: Enhance API documentation (e.g., using Swagger/OpenAPI)._
+- _Example: Add support for image uploads for events._
+
 ## Prerequisites
 
 -   Node.js (v18 or later recommended)
