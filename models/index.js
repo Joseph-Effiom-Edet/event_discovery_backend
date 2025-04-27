@@ -206,8 +206,19 @@ const Category = {
  */
 const Bookmark = {
   async getByUserId(userId) {
-    const bookmarks = await db.select().from(schema.bookmarks).where(eq(schema.bookmarks.user_id, userId));
-    return bookmarks;
+    // Join bookmarks with events to return full event details
+    const results = await db
+      .select({
+          // Select all fields from the events table
+          ...schema.events 
+      })
+      .from(schema.bookmarks)
+      .innerJoin(schema.events, eq(schema.bookmarks.event_id, schema.events.id))
+      .where(eq(schema.bookmarks.user_id, userId))
+      .orderBy(schema.events.start_date); // Optional: Order by event start date
+      
+    // The select shape directly gives us the event objects
+    return results; 
   },
 
   async getByUserAndEvent(userId, eventId) {
