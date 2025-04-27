@@ -31,8 +31,16 @@ const eventController = {
   // Get a single event by ID
   async getEventById(req, res) {
     try {
-      const eventId = req.params.id;
-      const event = await Event.getById(eventId);
+      const eventId = parseInt(req.params.id, 10);
+      // Get authenticated user ID (will be null if not logged in)
+      const userId = req.user ? req.user.id : null; 
+      
+      if (isNaN(eventId)) {
+        return res.status(400).json({ error: 'Invalid event ID' });
+      }
+
+      // Pass eventId and userId to the model function
+      const event = await Event.getById(eventId, userId); 
       
       if (!event) {
         return res.status(404).json({ error: 'Event not found' });

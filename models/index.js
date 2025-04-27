@@ -144,22 +144,40 @@ const Event = {
     return events;
   },
 
-  async getById(id) {
-    // Join events with categories to get category_name
-    const result = await db
+  async getById(id, userId = null) {
+    // Base query to get event and category name
+    let eventQuery = db
       .select({
-        // Select all fields from events table
         ...schema.events,
-        // Select category name and alias it
         category_name: schema.categories.name 
       })
       .from(schema.events)
       .leftJoin(schema.categories, eq(schema.events.category_id, schema.categories.id))
       .where(eq(schema.events.id, id));
-      
-    // Drizzle returns an array, even for potentially single results
-    const event = result[0]; 
-    return event; // Return the first (and likely only) result
+
+    const results = await eventQuery;
+    let event = results[0];
+
+    // If event found and a user ID was provided, check registration status
+    if (event && userId !== null) {
+      console.log(`[DB Log] Checking registration for user ${userId} and event ${id}`);
+      const [registration] = await db.select({ id: schema.registrations.id })
+        .from(schema.registrations)
+        .where(and(
+          eq(schema.registrations.event_id, id),
+          eq(schema.registrations.user_id, userId)
+        ))
+        .limit(1);
+        
+      // Add the registration status to the event object
+      event.isCurrentUserRegistered = !!registration; // Convert to boolean (true if registration exists)
+      console.log(`[DB Log] User ${userId} registration status for event ${id}:`, event.isCurrentUserRegistered);
+    } else if (event) {
+      // Ensure the field exists even if user is not logged in
+      event.isCurrentUserRegistered = false; 
+    }
+
+    return event; // Return the event object (potentially with registration status)
   },
 
   async create(eventData) {
