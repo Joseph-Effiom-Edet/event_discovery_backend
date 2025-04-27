@@ -1,5 +1,7 @@
 const { User } = require('../models/index');
-const db = require('../db');
+const { db } = require('../db');
+const schema = require('../shared/schema');
+const { eq, and, ne } = require('drizzle-orm');
 
 const userController = {
   // Get the profile of the authenticated user
@@ -34,10 +36,13 @@ const userController = {
       }
       
       if (username) {
-        const { rows: [existingUser] } = await db.query(
-          'SELECT id FROM users WHERE username = $1 AND id != $2',
-          [username, userId]
-        );
+        // Check for existing username using Drizzle
+        const [existingUser] = await db.select({ id: schema.users.id })
+          .from(schema.users)
+          .where(and(
+            eq(schema.users.username, username),
+            ne(schema.users.id, userId) // Exclude the current user
+          ));
         
         if (existingUser) {
           return res.status(400).json({ error: 'Username is already in use' });
@@ -69,11 +74,10 @@ const userController = {
         return res.status(400).json({ error: 'Current and new passwords are required' });
       }
       
-      // Get the complete user record with password
-      const { rows: [user] } = await db.query(
-        'SELECT * FROM users WHERE id = $1',
-        [userId]
-      );
+      // Get the complete user record with password using Drizzle
+      const [user] = await db.select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userId));
       
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
