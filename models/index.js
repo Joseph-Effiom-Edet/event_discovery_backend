@@ -1,6 +1,7 @@
 const { db } = require('../db');
 const schema = require('../shared/schema');
 const { eq, and, sql } = require('drizzle-orm');
+const bcrypt = require('bcrypt');
 
 /**
  * User model methods using Drizzle ORM
@@ -30,7 +31,10 @@ const User = {
     return user;
   },
 
-  async updatePassword(id, hashedPassword) {
+  async updatePassword(id, newPassword) {
+    // Hash the new password before saving
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
     await db
       .update(schema.users)
       .set({ password: hashedPassword, updated_at: new Date() })
@@ -54,6 +58,19 @@ const User = {
       .orderBy(schema.events.start_date);
     
     return result.map(({ events }) => events);
+  },
+
+  // Add method to verify password
+  async verifyPassword(user, plainPassword) {
+    if (!user || !user.password || !plainPassword) {
+      return false;
+    }
+    try {
+      return await bcrypt.compare(plainPassword, user.password);
+    } catch (error) {
+      console.error('Error comparing passwords:', error);
+      return false;
+    }
   }
 };
 
