@@ -160,18 +160,25 @@ const Event = {
 
     // If event found and a user ID was provided, check registration status
     if (event && userId !== null) {
-      console.log(`[DB Log] Checking registration for user ${userId} and event ${id}`);
-      const [registration] = await db.select({ id: schema.registrations.id })
-        .from(schema.registrations)
-        .where(and(
-          eq(schema.registrations.event_id, id),
-          eq(schema.registrations.user_id, userId)
-        ))
-        .limit(1);
-        
-      // Add the registration status to the event object
-      event.isCurrentUserRegistered = !!registration; // Convert to boolean (true if registration exists)
-      console.log(`[DB Log] User ${userId} registration status for event ${id}:`, event.isCurrentUserRegistered);
+      const numericUserId = parseInt(userId, 10); // Ensure userId is a number
+      if (!isNaN(numericUserId)) {
+        console.log(`[DB Log] Checking registration for user ${numericUserId} and event ${id}`);
+        // Select the whole record to be certain
+        const [registration] = await db.select()
+          .from(schema.registrations)
+          .where(and(
+            eq(schema.registrations.event_id, id),
+            eq(schema.registrations.user_id, numericUserId)
+          ))
+          .limit(1);
+          
+        // Add the registration status to the event object
+        event.isCurrentUserRegistered = !!registration; 
+        console.log(`[DB Log] User ${numericUserId} registration status for event ${id}:`, event.isCurrentUserRegistered);
+      } else {
+        console.warn(`[DB Log] Invalid userId provided for registration check: ${userId}`);
+        event.isCurrentUserRegistered = false; // Default if userId is invalid
+      }
     } else if (event) {
       // Ensure the field exists even if user is not logged in
       event.isCurrentUserRegistered = false; 
