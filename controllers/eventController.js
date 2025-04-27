@@ -1,4 +1,5 @@
 const { Event } = require('../models/index');
+const { db } = require('../db');
 
 const eventController = {
   // Get all events with filtering
