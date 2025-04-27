@@ -128,8 +128,21 @@ const Event = {
   },
 
   async getById(id) {
-    const [event] = await db.select().from(schema.events).where(eq(schema.events.id, id));
-    return event;
+    // Join events with categories to get category_name
+    const result = await db
+      .select({
+        // Select all fields from events table
+        ...schema.events,
+        // Select category name and alias it
+        category_name: schema.categories.name 
+      })
+      .from(schema.events)
+      .leftJoin(schema.categories, eq(schema.events.category_id, schema.categories.id))
+      .where(eq(schema.events.id, id));
+      
+    // Drizzle returns an array, even for potentially single results
+    const event = result[0]; 
+    return event; // Return the first (and likely only) result
   },
 
   async create(eventData) {
