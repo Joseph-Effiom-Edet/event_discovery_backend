@@ -50,7 +50,7 @@ app.get('/admin/migrate-db', (req, res) => {
   }
 
   console.log('Migration requested via endpoint with valid secret. Executing...');
-  // Execute the migration command
+  // Execute the migration command (using the updated script name)
   exec('npm run db:push', { env: process.env }, (error, stdout, stderr) => {
     if (error) {
       console.error(`Migration Error: ${error.message}`);
