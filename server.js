@@ -3,6 +3,7 @@ require('dotenv').config(); // Load environment variables from .env file
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const { exec } = require('child_process'); // Import exec
 const eventRoutes = require('./routes/events');
 const userRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
@@ -30,6 +31,40 @@ app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/bookmarks', bookmarkRoutes);
 app.use('/api/categories', categoryRoutes);
+
+// !!! SECURITY WARNING !!!
+// This endpoint allows running database migrations via HTTP request.
+// It MUST be protected by a strong, secret key (MIGRATE_SECRET env var).
+// Remove or disable this endpoint after initial setup.
+app.get('/admin/migrate-db', (req, res) => {
+  const secret = req.query.secret;
+
+  if (!process.env.MIGRATE_SECRET) {
+    console.error('MIGRATE_SECRET environment variable is not set.');
+    return res.status(500).send('Migration endpoint not configured correctly (missing secret).');
+  }
+
+  if (secret !== process.env.MIGRATE_SECRET) {
+    console.warn('Unauthorized migration attempt detected.');
+    return res.status(403).send('Forbidden: Invalid secret.');
+  }
+
+  console.log('Migration requested via endpoint with valid secret. Executing...');
+  // Execute the migration command
+  exec('npm run db:push', { env: process.env }, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`Migration Error: ${error.message}`);
+      console.error(`stderr: ${stderr}`);
+      return res.status(500).send(`Migration failed:\nError: ${error.message}\nStderr: ${stderr}\nStdout: ${stdout}`);
+    }
+    if (stderr) {
+      // Drizzle often logs to stderr even on success, check stdout too
+      console.warn(`Migration Stderr: ${stderr}`);
+    }
+    console.log(`Migration Stdout: ${stdout}`);
+    res.status(200).send(`Migration process finished.\nStdout:\n${stdout}\nStderr:\n${stderr}`);
+  });
+});
 
 // Root route - API documentation
 app.get('/', (req, res) => {
