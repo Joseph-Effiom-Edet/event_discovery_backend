@@ -1,5 +1,7 @@
 const { Event } = require('../models/index');
 const { db } = require('../db');
+const schema = require('../shared/schema');
+const { eq, and, sql } = require('drizzle-orm');
 
 const eventController = {
   // Get all events with filtering
@@ -159,39 +161,46 @@ const eventController = {
   // Register for an event
   async registerForEvent(req, res) {
     try {
-      const eventId = req.params.id;
+      const eventId = parseInt(req.params.id, 10);
       const userId = req.user.id;
+
+      if (isNaN(eventId)) {
+        return res.status(400).json({ error: 'Invalid event ID' });
+      }
       
+      // Fetch event details (including capacity)
       const event = await Event.getById(eventId);
       if (!event) {
         return res.status(404).json({ error: 'Event not found' });
       }
       
-      // Check if the event has reached capacity
-      const { rows: [{ count }] } = await db.query(
-        'SELECT COUNT(*) FROM registrations WHERE event_id = $1',
-        [eventId]
-      );
-      
-      if (parseInt(count) >= event.capacity) {
-        return res.status(400).json({ error: 'Event has reached capacity' });
+      // Check if the event has capacity (if capacity is defined)
+      if (event.capacity !== null && event.capacity !== undefined) {
+          const [{ count }] = await db.select({ count: sql`count(*)::int` })
+              .from(schema.registrations)
+              .where(eq(schema.registrations.event_id, eventId));
+          
+          if (count >= event.capacity) {
+            return res.status(400).json({ error: 'Event has reached capacity' });
+          }
       }
       
       // Check if user is already registered
-      const { rows: [existingRegistration] } = await db.query(
-        'SELECT * FROM registrations WHERE event_id = $1 AND user_id = $2',
-        [eventId, userId]
-      );
-      
+      const [existingRegistration] = await db.select()
+        .from(schema.registrations)
+        .where(and(
+          eq(schema.registrations.event_id, eventId),
+          eq(schema.registrations.user_id, userId)
+        ));
+        
       if (existingRegistration) {
         return res.status(400).json({ error: 'Already registered for this event' });
       }
       
       // Register the user
-      const { rows: [registration] } = await db.query(
-        'INSERT INTO registrations (event_id, user_id) VALUES ($1, $2) RETURNING *',
-        [eventId, userId]
-      );
+      const [registration] = await db.insert(schema.registrations)
+        .values({ event_id: eventId, user_id: userId })
+        .returning();
       
       res.status(201).json(registration);
     } catch (error) {
@@ -203,15 +212,23 @@ const eventController = {
   // Cancel registration for an event
   async cancelRegistration(req, res) {
     try {
-      const eventId = req.params.id;
+      const eventId = parseInt(req.params.id, 10);
       const userId = req.user.id;
+
+      if (isNaN(eventId)) {
+        return res.status(400).json({ error: 'Invalid event ID' });
+      }
       
-      const { rows: [registration] } = await db.query(
-        'DELETE FROM registrations WHERE event_id = $1 AND user_id = $2 RETURNING *',
-        [eventId, userId]
-      );
+      // Delete the registration
+      const [deletedRegistration] = await db.delete(schema.registrations)
+        .where(and(
+          eq(schema.registrations.event_id, eventId),
+          eq(schema.registrations.user_id, userId)
+        ))
+        .returning(); // Get the deleted record back to confirm deletion
       
-      if (!registration) {
+      if (!deletedRegistration) {
+        // If nothing was returned, the registration didn't exist
         return res.status(404).json({ error: 'Registration not found' });
       }
       
