@@ -71,10 +71,37 @@ const Event = {
 
     // Apply category filter
     if (filters.category_id) {
-      // Ensure category_id is treated as a number
       const categoryId = parseInt(filters.category_id, 10);
       if (!isNaN(categoryId)) {
           conditions.push(eq(schema.events.category_id, categoryId));
+      }
+    }
+
+    // Apply location filter (using Haversine formula)
+    if (filters.lat && filters.lng && filters.radius) {
+      const lat = parseFloat(filters.lat);
+      const lng = parseFloat(filters.lng);
+      const radius = parseFloat(filters.radius); // Assuming radius is in kilometers
+
+      if (!isNaN(lat) && !isNaN(lng) && !isNaN(radius)) {
+        // Haversine formula parts (SQL)
+        // 6371 is the approximate radius of the Earth in km
+        const R = 6371;
+        const lat1Rad = sql`radians(${lat})`;
+        const lng1Rad = sql`radians(${lng})`;
+        const lat2Rad = sql`radians(${schema.events.latitude})`;
+        const lng2Rad = sql`radians(${schema.events.longitude})`;
+
+        const dLat = sql`(${lat2Rad} - ${lat1Rad})`;
+        const dLng = sql`(${lng2Rad} - ${lng1Rad})`;
+
+        const a = sql`sin(${dLat} / 2) * sin(${dLat} / 2) + cos(${lat1Rad}) * cos(${lat2Rad}) * sin(${dLng} / 2) * sin(${dLng} / 2)`;
+        // Use LEAST(1.0, ...) to avoid issues with floating point errors potentially making the value slightly > 1 for atan2
+        const c = sql`2 * atan2(sqrt(least(1.0, ${a})), sqrt(greatest(0.0, 1 - ${a})))`; 
+        const distance = sql`${R} * ${c}`;
+
+        // Add the distance condition
+        conditions.push(sql`${distance} <= ${radius}`);
       }
     }
     
