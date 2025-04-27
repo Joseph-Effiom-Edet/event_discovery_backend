@@ -14,13 +14,14 @@ This directory contains the backend API server for the Local Event Finder applic
   - [Database Setup](#database-setup)
   - [Environment Variables](#environment-variables)
   - [Running the Server](#running-the-server)
+  - [Running with Docker](#running-with-docker)
 - [API Endpoints](#api-endpoints)
 - [Database Migrations](#database-migrations)
 - [Deployment](#deployment)
 
 ## Description
 
-The backend is a Node.js application built with the Express framework. It provides RESTful API endpoints for managing events, users, categories, and bookmarks. It uses PostgreSQL as its primary database and interacts with it via the Drizzle ORM. Authentication is handled using JSON Web Tokens (JWT).
+The backend is a Node.js application built with the Express framework. It provides RESTful API endpoints for managing events, users, categories, and bookmarks. It uses PostgreSQL as its primary database and interacts with it via the Drizzle ORM. Authentication is handled using JSON Web Tokens (JWT). This backend is designed to be run directly using Node.js or as a Docker container.
 
 ## Tech Stack
 
@@ -29,6 +30,7 @@ The backend is a Node.js application built with the Express framework. It provid
 -   **Database:** PostgreSQL
 -   **ORM:** Drizzle ORM
 -   **Authentication:** JWT (jsonwebtoken), bcrypt (for password hashing)
+-   **Containerization:** Docker
 -   **Dependencies:** `pg`, `cors`, `dotenv`, `body-parser`
 
 ## Features
@@ -38,13 +40,15 @@ The backend is a Node.js application built with the Express framework. It provid
 -   CRUD operations for Events, Categories
 -   User bookmarking functionality
 -   API endpoint documentation served at the root (`/`)
+-   Docker support for consistent development and deployment
 
 ## Prerequisites
 
 -   Node.js (v18 or later recommended)
 -   npm (usually comes with Node.js)
 -   Git
--   A running PostgreSQL database instance
+-   A running PostgreSQL database instance (required for direct Node.js run and migrations)
+-   Docker and Docker Compose (optional, for running via Docker)
 
 ## Getting Started
 
@@ -56,7 +60,7 @@ git clone <repository_url>
 cd LocalEventFinder-1/backend
 ```
 
-### Installation
+### Installation (For Direct Node.js Usage)
 
 Install the required dependencies using npm:
 
@@ -66,7 +70,7 @@ npm install
 
 ### Database Setup
 
-1.  Ensure you have a PostgreSQL server running.
+1.  Ensure you have a PostgreSQL server running (locally or remotely).
 2.  Create a new database for this application (e.g., `localevents_db`).
 3.  Keep the connection details handy (host, port, username, password, database name).
 
@@ -77,41 +81,89 @@ The backend requires certain environment variables to connect to the database an
 ```env
 # backend/.env
 
-# Database Connection
+# Database Connection (Replace with your actual connection details)
+# Example for local PostgreSQL:
 DB_HOST=localhost
 DB_PORT=5432
 DB_USER=your_postgres_user
 DB_PASSWORD=your_postgres_password
-DB_DATABASE=localevents_db # Or the name you chose
+DB_DATABASE=localevents_db
+
+# Example DATABASE_URL (some services like Render or Docker Compose might prefer this format):
+# DATABASE_URL=postgres://your_postgres_user:your_postgres_password@localhost:5432/localevents_db
+# Note: The application currently uses individual DB_* variables from db.js.
+# Ensure these match your DATABASE_URL if using both.
 
 # JWT Secret (Choose a strong, random string)
 JWT_SECRET=your_super_secret_jwt_key
 
-# Server Port (Optional, defaults to 8000)
-PORT=8000
+# Server Port (Optional, defaults to value in server.js, Dockerfile sets to 3000)
+# PORT=8000
 ```
 
 Replace the placeholder values with your actual database credentials and a secure JWT secret.
 
-### Running the Server
+### Running the Server (Directly with Node.js)
 
 **Development Mode (with automatic restarts on file changes):**
 
 ```bash
+# Ensure your .env file is configured
 npm run dev
 ```
 
 **Production Mode:**
 
 ```bash
+# Ensure your .env file is configured
 npm start
 ```
 
 The server should start, and you'll see a message indicating the port it's running on (e.g., `Server running on http://0.0.0.0:8000`).
 
+### Running with Docker
+
+The backend includes a `Dockerfile` for containerized deployment.
+
+**Build the Docker Image:**
+
+```bash
+# Run from the LocalEventFinder-1/backend directory
+docker build -t localeventfinder-backend .
+```
+
+**Run the Docker Container:**
+
+You need to provide the necessary environment variables to the container at runtime. Create a file named `docker.env` (or similar, ensure it's in `.gitignore` or `.dockerignore`) in the `backend` directory with the same content as your `.env` file, but adjust `DB_HOST` if your database is running outside Docker (e.g., use `host.docker.internal` on Docker Desktop, or the host IP).
+
+```env
+# backend/docker.env
+
+DB_HOST=host.docker.internal # Or your DB host IP if not running Docker Compose
+DB_PORT=5432
+DB_USER=your_postgres_user
+DB_PASSWORD=your_postgres_password
+DB_DATABASE=localevents_db
+
+JWT_SECRET=your_super_secret_jwt_key
+
+# PORT will be 3000 inside the container as per Dockerfile
+```
+
+Then run the container, mapping the internal port (3000) to a host port (e.g., 8000) and passing the environment variables:
+
+```bash
+# Run from the LocalEventFinder-1/backend directory
+docker run --env-file docker.env -p 8000:3000 --name eventfinder-be localeventfinder-backend
+```
+
+The backend API should now be accessible on `http://localhost:8000`.
+
+**Note:** For a more robust local Docker setup involving both the backend and a database, consider using Docker Compose.
+
 ## API Endpoints
 
-Basic API documentation and a list of endpoints are available by navigating to the root URL (e.g., `http://localhost:8000/`) in your browser when the server is running.
+Basic API documentation and a list of endpoints are available by navigating to the root URL (e.g., `http://localhost:8000/` when running via Node or Docker) in your browser when the server is running.
 
 Key endpoint prefixes:
 - `/api/auth`: Authentication (register, login)
@@ -125,35 +177,58 @@ Key endpoint prefixes:
 
 This project uses Drizzle ORM and Drizzle Kit for managing the database schema.
 
-To apply the current schema defined in `./shared/schema.ts` to your database (creating tables, columns, etc.), run:
+**Running Migrations (Directly with Node.js):**
+
+Ensure your `.env` file is correctly configured with database credentials. Then, run:
 
 ```bash
 npm run db:push
 ```
 
-Ensure your `.env` file is correctly configured before running this command, as it needs to connect to the database.
+**Running Migrations (When Using Docker):**
+
+If your backend is running in a Docker container, you need to execute the migration command *inside* the running container:
+
+```bash
+# Find your running container name (e.g., eventfinder-be)
+docker ps
+
+# Execute the migration command inside the container
+docker exec -it eventfinder-be npm run db:push
+```
 
 To generate new migration files based on changes to your schema (though `db:push` is often sufficient for development):
 
 ```bash
+# Run directly with Node.js
 npm run db:generate
+
+# Or inside the Docker container
+docker exec -it eventfinder-be npm run db:generate
 ```
 
-## Deployment
+## Deployment (Render with Docker)
 
-This backend application is configured to be deployed on platforms supporting Node.js applications.
+This backend is configured for deployment to Render using Docker.
 
-**General Steps:**
-
-1.  **Choose a Platform:** Platforms like Render, Railway, Fly.io, or Heroku are suitable.
-2.  **Connect Git Repository:** Link your Git repository to the deployment platform.
-3.  **Configure Settings:**
-    -   **Root Directory:** Set to `backend` (if deploying from the monorepo root).
-    -   **Build Command:** `npm install`
-    -   **Start Command:** `npm start`
-4.  **Set Environment Variables:** Configure the same environment variables (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_DATABASE`, `JWT_SECRET`, `NODE_ENV=production`) in the platform's dashboard using the credentials for your *deployed* database instance.
-5.  **Database:** Provision a PostgreSQL database on your chosen platform or use a third-party provider (like Neon, Supabase DB). Ensure the connection details are correctly set in the environment variables.
-6.  **Run Migrations:** After the initial deployment, use the platform's console/shell feature to run `npm run db:push` to set up the database schema on the deployment target.
-
-Refer to the specific documentation of your chosen deployment platform for detailed instructions.
+1.  **Push to GitHub:** Ensure `backend/Dockerfile` and `backend/.dockerignore` are committed and pushed to your GitHub repository.
+2.  **Render Service Configuration:**
+    -   Navigate to your Web Service on Render.
+    -   Go to **Settings** > **Build & Deploy**.
+    -   Set **Runtime** to **Docker**.
+    -   Set **Dockerfile Path** to `backend/Dockerfile`.
+    -   Set **Build Context Directory** to `backend`.
+    -   Save changes.
+3.  **Environment Variables:**
+    -   Go to the **Environment** section for your Render service.
+    -   Ensure you have an environment variable group linked or variables set for:
+        -   `DATABASE_URL`: Render should provide this automatically if you linked a Render PostgreSQL database. The application needs to be able to parse this or have the individual `DB_*` variables set.
+        -   `JWT_SECRET`: Set a strong, unique secret for the production environment.
+        -   `NODE_ENV`: Set to `production`.
+        -   *(Optional)* `PORT`: Render sets this automatically; the Dockerfile uses it.
+    -   **Crucially:** Verify that the application logic in `db.js` correctly prioritizes `DATABASE_URL` or uses the `DB_*` variables set in the Render environment. If using individual `DB_*` variables, make sure they match the credentials of your Render PostgreSQL instance.
+4.  **Database Migrations:**
+    -   After a successful deployment, connect to your service using Render's **Shell** tab.
+    -   Run the database migration command inside the shell: `npm run db:push`
+5.  **Trigger Deployment:** Deploy the latest commit manually or rely on auto-deploy if configured.
 "" 
