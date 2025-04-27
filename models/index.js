@@ -1,6 +1,6 @@
 const { db } = require('../db');
 const schema = require('../shared/schema');
-const { eq } = require('drizzle-orm');
+const { eq, and, sql } = require('drizzle-orm');
 
 /**
  * User model methods using Drizzle ORM
@@ -62,15 +62,40 @@ const User = {
  */
 const Event = {
   async getAll(filters = {}) {
+    console.log('[DB Log] Event.getAll received filters:', filters);
+    // Start with the base query
     let query = db.select().from(schema.events);
     
-    // Apply filters if provided
-    if (filters.categoryId) {
-      return await db.select().from(schema.events).where(eq(schema.events.category_id, filters.categoryId));
+    // Build an array of conditions for the WHERE clause
+    const conditions = [];
+
+    // Apply category filter
+    if (filters.category_id) {
+      // Ensure category_id is treated as a number
+      const categoryId = parseInt(filters.category_id, 10);
+      if (!isNaN(categoryId)) {
+          conditions.push(eq(schema.events.category_id, categoryId));
+      }
     }
     
-    // TODO: Add more filters as needed
-    
+    // TODO: Add other filters here, pushing to the `conditions` array
+    // Example: Search filter
+    // if (filters.search) {
+    //   conditions.push(sql`lower(${schema.events.title}) like ${'%' + filters.search.toLowerCase() + '%'}`);
+    // }
+
+    console.log('[DB Log] Conditions built:', conditions);
+
+    // Apply conditions if any exist
+    if (conditions.length > 0) {
+        query = query.where(and(...conditions)); // Use 'and' to combine multiple conditions
+    }
+
+    // TODO: Add limit and offset later if needed
+    // if (filters.limit) { query = query.limit(filters.limit); }
+    // if (filters.offset) { query = query.offset(filters.offset); }
+
+    // Execute the final query
     const events = await query;
     return events;
   },

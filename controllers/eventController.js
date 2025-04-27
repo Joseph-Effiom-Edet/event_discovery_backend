@@ -4,6 +4,7 @@ const eventController = {
   // Get all events with filtering
   async getAllEvents(req, res) {
     try {
+      console.log('[API Log] Received query params:', req.query);
       const filters = {
         category_id: req.query.category_id,
         search: req.query.search,
